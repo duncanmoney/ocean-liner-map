@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Union-Castle Round Africa — Ocean Liner Journey Map</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap');
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Spectral',Georgia,serif; background:#ece0c8; color:#3a2e20; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+
+#hdr {
+  background:linear-gradient(90deg,#1d4f5e,#2a6072);
+  padding:9px 16px; display:flex; align-items:center; justify-content:space-between;
+  border-bottom:3px solid #9c5a2a; flex-shrink:0; gap:10px; flex-wrap:wrap;
+}
+#hdr-left h1 { font-family:'Cinzel',serif; font-size:15px; letter-spacing:2px; text-transform:uppercase; color:#f3e5c4; }
+#hdr-left p { font-size:11px; color:#bcd4d8; margin-top:2px; }
+.badge {
+  background:#9c5a2a; color:#f3e5c4; font-family:'Cinzel',serif; font-weight:700;
+  padding:5px 14px; border-radius:3px; font-size:12px; letter-spacing:1px; flex-shrink:0;
+}
+
+#body { display:flex; flex:1; overflow:hidden; }
+#map { flex:1; background:#aecdd4; }
+/* warm the basemap tiles toward an aged nautical-chart palette */
+#map .leaflet-tile-pane { filter:sepia(0.22) saturate(0.9) brightness(1.04) contrast(0.95); }
+#panel { width:300px; background:#f2e8d2; border-left:2px solid #c9b48a; display:flex; flex-direction:column; flex-shrink:0; }
+
+#ph { background:#e3d3ad; padding:11px 14px; border-bottom:1px solid #c9b48a; flex-shrink:0; }
+#ph-city { font-family:'Cinzel',serif; font-size:16px; color:#7a3b1a; text-transform:uppercase; letter-spacing:1px; font-weight:700; }
+#ph-mod { font-size:11px; color:#6b5a40; font-style:italic; margin-top:2px; }
+#ph-cnt { font-size:10px; color:#947d56; margin-top:3px; text-transform:uppercase; letter-spacing:1px; }
+
+#pc { flex:1; overflow-y:auto; padding:10px 12px; }
+.ri { background:#faf3e2; border:1px solid #d3bf95; border-radius:5px; margin-bottom:7px; padding:9px 11px; cursor:pointer; transition:all 0.15s; }
+.ri:hover { background:#fff9ec; border-color:#9c5a2a; transform:translateX(2px); box-shadow:0 1px 4px rgba(120,80,30,0.15); }
+.ri-d { font-size:13px; font-weight:600; color:#7a3b1a; }
+.ri-t { font-family:'Cinzel',serif; font-size:20px; font-weight:700; margin:2px 0 1px; }
+.ri-s { font-size:10px; color:#7a6a4c; }
+.ri-m { font-size:10px; color:#9a8a64; font-style:italic; }
+.ri-n { font-size:9px; color:#8a7654; margin-top:3px; border-top:1px solid #ddc9a0; padding-top:3px; }
+
+#leg { background:#e7d8b6; border-top:1px solid #c9b48a; padding:9px 13px; flex-shrink:0; }
+.lt { font-size:9px; text-transform:uppercase; color:#7a6a4c; letter-spacing:1px; margin-bottom:5px; }
+.li { display:flex; align-items:center; gap:7px; margin-bottom:4px; font-size:10px; color:#5a4a32; }
+.ll { height:3px; width:20px; border-radius:2px; }
+.note { font-size:9px; color:#8a6a3a; margin-top:7px; line-height:1.4; border-top:1px solid #d8c398; padding-top:6px; }
+.src { font-size:9px; color:#8a7654; margin-top:6px; font-style:italic; }
+
+.empty { color:#8a7654; text-align:center; padding:28px 12px; font-style:italic; font-size:12px; line-height:1.7; }
+
+.leaflet-tooltip {
+  background:rgba(243,229,196,0.95)!important; border:1px solid #9c5a2a!important; color:#5a2e12!important;
+  font-size:10px!important; font-family:'Spectral',serif!important; padding:1px 6px!important;
+  border-radius:2px!important; white-space:nowrap!important; box-shadow:none!important;
+}
+.leaflet-tooltip::before { display:none!important; }
+.leaflet-control-attribution { font-size:9px!important; opacity:0.4!important; }
+.leaflet-control-zoom a { background:#f3e5c4!important; color:#7a3b1a!important; border-color:#c9b48a!important; }
+.leaflet-control-zoom a:hover { background:#fff9ec!important; }
+.port-dot { background:#7a3b1a; border:2px solid #f3e5c4; border-radius:50%; box-shadow:0 0 0 1px #5a2e12; }
+.port-dot.sel { background:#c0392b; box-shadow:0 0 9px rgba(192,57,43,0.7),0 0 0 1px #8a1f12; }
+.port-dot.org { background:#1d7a4a; box-shadow:0 0 9px rgba(29,122,74,0.7),0 0 0 1px #0f4a2a; }
+.port-dot.dst { background:#c0392b; box-shadow:0 0 11px rgba(192,57,43,0.9),0 0 0 1px #8a1f12; }
+
+/* Mode toggle */
+.mode-toggle { display:flex; gap:0; align-items:center; flex-shrink:0; border:1.5px solid #f3e5c4; border-radius:4px; overflow:hidden; }
+.mode-btn {
+  padding:6px 14px; border:none; background:transparent; color:#f3e5c4;
+  font-family:'Spectral',serif; font-size:12px; cursor:pointer; transition:all 0.15s; letter-spacing:0.5px; white-space:nowrap;
+}
+.mode-btn.active { background:#f3e5c4; color:#1d4f5e; font-weight:600; }
+.mode-btn:hover:not(.active) { background:rgba(243,229,196,0.2); }
+
+/* Journey summary block */
+.jtotal { background:#e3d3ad; border:1px solid #9c5a2a; border-radius:6px; padding:11px 13px; margin-bottom:10px; text-align:center; }
+.jtotal .jt-d { font-family:'Cinzel',serif; font-size:30px; font-weight:700; color:#7a3b1a; line-height:1; }
+.jtotal .jt-l { font-size:11px; color:#5a4a32; margin-top:4px; }
+.jtotal .jt-r { font-size:10px; color:#7a6a4c; font-style:italic; margin-top:5px; }
+.altbtn {
+  display:block; width:100%; margin-bottom:10px; padding:7px 10px; border:1px solid #c9b48a;
+  background:#faf3e2; color:#5a4a32; font-family:'Spectral',serif; font-size:11px; border-radius:5px;
+  cursor:pointer; transition:all 0.15s;
+}
+.altbtn:hover { border-color:#9c5a2a; background:#fff9ec; color:#7a3b1a; }
+.altbtn:disabled { opacity:0.4; cursor:default; }
+.jleg { display:flex; align-items:flex-start; gap:9px; padding:7px 4px; border-bottom:1px solid #ddc9a0; }
+.jleg:last-child { border-bottom:none; }
+.jleg-num { flex-shrink:0; width:20px; height:20px; border-radius:50%; background:#e3d3ad; color:#7a3b1a; font-size:10px; display:flex; align-items:center; justify-content:center; margin-top:2px; }
+.jleg-body { flex:1; }
+.jleg-route { font-size:12px; color:#3a2e20; }
+.jleg-route b { color:#7a3b1a; font-weight:600; }
+.jleg-meta { font-size:10px; color:#7a6a4c; margin-top:1px; }
+.jleg-d { flex-shrink:0; font-family:'Cinzel',serif; font-size:14px; font-weight:700; margin-top:1px; }
+.jhint { font-size:11px; color:#7a6a4c; font-style:italic; padding:4px 0 9px; }
+</style>
+</head>
+<body>
+<div id="hdr">
+  <div id="hdr-left">
+    <h1>⚓ Union-Castle Round Africa</h1>
+    <p id="hdr-sub">Click any port to see sailing times · Mail & Intermediate services</p>
+  </div>
+  <div class="mode-toggle">
+    <button class="mode-btn active" id="mb-direct" onclick="setMode('direct')">Direct times</button>
+    <button class="mode-btn" id="mb-plan" onclick="setMode('plan')">Plan a journey</button>
+  </div>
+</div>
+<div id="body">
+  <div id="map"></div>
+  <div id="panel">
+    <div id="ph">
+      <div id="ph-city">Select a Port</div>
+      <div id="ph-mod">Click any port on the map</div>
+      <div id="ph-cnt">to see sailing times</div>
+    </div>
+    <div id="pc"><div class="empty">⚓ Click a port to explore sailing times.<br><br>The route forms a great loop around Africa — out via the Suez Canal and home via the West Coast, or the reverse.</div></div>
+    <div id="leg">
+      <div class="lt">Sailing Duration</div>
+      <div class="li"><div class="ll" style="background:#2e8b57"></div> 1 day or less</div>
+      <div class="li"><div class="ll" style="background:#c99a1e"></div> 2 – 3 days</div>
+      <div class="li"><div class="ll" style="background:#c4641f"></div> 4 – 5 days</div>
+      <div class="li"><div class="ll" style="background:#a52a1a"></div> 6 + days</div>
+      <div class="note">Figures are sailing time between ports and exclude days spent in port. Routes are approximate.</div>
+      <div class="src">Source: Union-Castle Line, Round Africa Services timetable, June 1955 – May 1956</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Ports extracted from the route map ──
+const P = {
+  "London":           {lat:51.507, lng:-0.128,  modern:"London, England"},
+  "Gibraltar":        {lat:36.140, lng:-5.353,  modern:"Gibraltar"},
+  "Marseilles":       {lat:43.296, lng:5.370,   modern:"Marseille, France"},
+  "Genoa":            {lat:44.405, lng:8.946,    modern:"Genoa, Italy"},
+  "Port Said":        {lat:31.265, lng:32.301,   modern:"Port Said, Egypt"},
+  "Suez":             {lat:29.967, lng:32.550,   modern:"Suez, Egypt"},
+  "Aden":             {lat:12.785, lng:45.018,   modern:"Aden, Yemen"},
+  "Mombasa":          {lat:-4.043, lng:39.668,   modern:"Mombasa, Kenya"},
+  "Tanga":            {lat:-5.069, lng:39.099,   modern:"Tanga, Tanzania"},
+  "Zanzibar":         {lat:-6.165, lng:39.199,   modern:"Zanzibar, Tanzania"},
+  "Dar es Salaam":    {lat:-6.792, lng:39.208,   modern:"Dar es Salaam, Tanzania"},
+  "Beira":            {lat:-19.844,lng:34.839,   modern:"Beira, Mozambique"},
+  "Lourenco Marques": {lat:-25.967,lng:32.583,   modern:"Maputo, Mozambique"},
+  "Durban":           {lat:-29.858,lng:31.025,   modern:"Durban, South Africa"},
+  "East London":      {lat:-33.018,lng:27.911,   modern:"East London, South Africa"},
+  "Port Elizabeth":   {lat:-33.961,lng:25.615,   modern:"Gqeberha, South Africa"},
+  "Cape Town":        {lat:-33.925,lng:18.424,   modern:"Cape Town, South Africa"},
+  "St Helena":        {lat:-15.965,lng:-5.708,   modern:"St Helena (UK)"},
+  "Ascension":        {lat:-7.947, lng:-14.355,  modern:"Ascension Island (UK)"},
+  "Las Palmas":       {lat:28.124, lng:-15.430,  modern:"Las Palmas, Canary Is."},
+  "Lobito":           {lat:-12.348,lng:13.546,   modern:"Lobito, Angola"},
+  "Walvis Bay":       {lat:-22.957,lng:14.505,   modern:"Walvis Bay, Namibia"},
+};
+
+// ── Sailing legs in DAYS, derived from the 1955-56 timetable dates ──
+// {a, b, d:days, s:service, n:note}
+const LEGS = [
+  // Mail service — England via Suez Canal & East Coast (Dunnottar Castle, Jun 1955)
+  {a:"London", b:"Gibraltar", d:4, s:"Suez / East Coast service"},
+  {a:"Gibraltar", b:"Marseilles", d:2, s:"Suez / East Coast service"},
+  {a:"Marseilles", b:"Genoa", d:1, s:"Suez / East Coast service"},
+  {a:"Genoa", b:"Port Said", d:4, s:"Suez / East Coast service"},
+  {a:"Port Said", b:"Suez", d:1, s:"Transit of the Suez Canal"},
+  {a:"Suez", b:"Aden", d:4, s:"Suez / East Coast service", n:"Down the Red Sea"},
+  {a:"Aden", b:"Mombasa", d:5, s:"Suez / East Coast service", n:"Indian Ocean crossing"},
+  {a:"Mombasa", b:"Tanga", d:1, s:"East African coast"},
+  {a:"Tanga", b:"Zanzibar", d:1, s:"East African coast", n:"Often same-day; calls are approximate"},
+  {a:"Zanzibar", b:"Dar es Salaam", d:1, s:"East African coast"},
+  {a:"Dar es Salaam", b:"Beira", d:2, s:"Mozambique Channel"},
+  {a:"Beira", b:"Lourenco Marques", d:2, s:"Mozambique coast"},
+  {a:"Lourenco Marques", b:"Durban", d:1, s:"South-East African coast"},
+
+  // South African coastal hops (common to all services)
+  {a:"Durban", b:"East London", d:1, s:"South African coast"},
+  {a:"East London", b:"Port Elizabeth", d:1, s:"South African coast"},
+  {a:"Port Elizabeth", b:"Cape Town", d:2, s:"South African coast"},
+
+  // Mail service — homeward via West Coast (Durban Castle, Jul 1955)
+  {a:"Cape Town", b:"St Helena", d:4, s:"West Coast mail service", n:"South Atlantic"},
+  {a:"St Helena", b:"Ascension", d:2, s:"West Coast mail service"},
+  {a:"Ascension", b:"Las Palmas", d:5, s:"West Coast mail service", n:"North-bound Atlantic"},
+  {a:"Las Palmas", b:"London", d:6, s:"West Coast mail service", n:"Final run home"},
+
+  // Intermediate service — West Coast (Bloemfontein Castle, May 1955)
+  {a:"London", b:"Las Palmas", d:6, s:"Intermediate West Coast service"},
+  {a:"Las Palmas", b:"Lobito", d:8, s:"Intermediate West Coast service", n:"Long open-Atlantic run to Angola"},
+  {a:"Lobito", b:"Walvis Bay", d:2, s:"Intermediate West Coast service"},
+  {a:"Walvis Bay", b:"Cape Town", d:2, s:"Intermediate West Coast service"},
+];
+
+// Build adjacency (bidirectional)
+const CONN = {};
+function add(a,b,leg){ (CONN[a]=CONN[a]||{})[b] = leg; }
+LEGS.forEach(l=>{ add(l.a,l.b,l); add(l.b,l.a,l); });
+
+// ── Route finding (Dijkstra on days) ──
+// Find shortest route by total days. `banned` is a Set of "A|B" edges to exclude
+// (used to force the alternative way around the loop).
+function findRoute(start, goal, banned){
+  banned = banned || new Set();
+  const dist={}, prev={}, visited={};
+  Object.keys(P).forEach(k=>dist[k]=Infinity);
+  dist[start]=0;
+  const pq=[[0,start]];
+  while(pq.length){
+    pq.sort((a,b)=>a[0]-b[0]);
+    const [d,u]=pq.shift();
+    if(visited[u]) continue;
+    visited[u]=true;
+    if(u===goal) break;
+    Object.entries(CONN[u]||{}).forEach(([v,leg])=>{
+      const ek1=u+"|"+v, ek2=v+"|"+u;
+      if(banned.has(ek1)||banned.has(ek2)) return;
+      const nd=d+leg.d;
+      if(nd<dist[v]){ dist[v]=nd; prev[v]=u; pq.push([nd,v]); }
+    });
+  }
+  if(dist[goal]===Infinity) return null;
+  // reconstruct
+  const seq=[]; let cur=goal;
+  while(cur!==undefined){ seq.unshift(cur); cur=prev[cur]; }
+  // build legs
+  const legs=[];
+  for(let i=0;i<seq.length-1;i++){
+    legs.push({from:seq[i], to:seq[i+1], ...CONN[seq[i]][seq[i+1]]});
+  }
+  return {seq, legs, days:dist[goal]};
+}
+
+// Find the two distinct ways round the loop: shortest, and the best alternative
+// that avoids the shortest route's first hop (forcing it the other direction).
+function findBothRoutes(start, goal){
+  const primary=findRoute(start, goal, null);
+  if(!primary) return {primary:null, alt:null};
+  if(primary.legs.length===0) return {primary, alt:null};
+  // Ban the first edge of the primary route to push the search the other way
+  const firstLeg=primary.legs[0];
+  const banned=new Set([firstLeg.from+"|"+firstLeg.to]);
+  let alt=findRoute(start, goal, banned);
+  // If alt retraces the same overall path or is identical, discard
+  if(alt && alt.seq.join(">")===primary.seq.join(">")) alt=null;
+  return {primary, alt};
+}
+
+// ── Map setup ──
+const map = L.map('map', {zoomControl:true, attributionControl:true, worldCopyJump:false}).setView([5,18], 3);
+
+// Primary basemap — Esri "World Ocean Base", keyless tiles with soft
+// bathymetric blues and muted land that suit an ocean-liner map. A warm
+// CSS tint (see #map .leaflet-tile-pane) ages it toward a nautical chart.
+// A matching labels layer rides on top so place names stay legible.
+// If the ocean tiles fail to load, fall back to standard OpenStreetMap.
+let usedFallback = false;
+const primary = L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}', {
+  attribution:'Tiles &copy; Esri &mdash; Sources: GEBCO, NOAA, National Geographic, Garmin, and others', maxZoom:10, minZoom:2
+}).addTo(map);
+
+const oceanLabels = L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}', {
+  maxZoom:10, minZoom:2, pane:'overlayPane'
+}).addTo(map);
+
+primary.on('tileerror', () => {
+  if (usedFallback) return;
+  usedFallback = true;
+  map.removeLayer(primary);
+  if (map.hasLayer(oceanLabels)) map.removeLayer(oceanLabels);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution:'&copy; OpenStreetMap contributors', maxZoom:10, minZoom:2
+  }).addTo(map);
+});
+
+function col(d){ if(d<=1) return '#2e8b57'; if(d<=3) return '#c99a1e'; if(d<=5) return '#c4641f'; return '#a52a1a'; }
+function fmt(d){ return d===0 ? 'same day' : d + (d===1?' day':' days'); }
+
+function mkIcon(state){
+  // state: '', 'sel', 'org', 'dst'
+  const big = state==='org'||state==='dst'||state==='sel';
+  const cls = state ? ' '+state : '';
+  const sz = big?14:10;
+  return L.divIcon({className:'', html:`<div class="port-dot${cls}" style="width:${sz}px;height:${sz}px;"></div>`,
+    iconSize:[sz,sz], iconAnchor:[sz/2,sz/2]});
+}
+
+const mkrs={}, bounds=[];
+let rLines=[];
+let mode='direct';
+let origin=null, dest=null;      // journey-plan endpoints
+let routeData=null, showingAlt=false;
+
+Object.entries(P).forEach(([name,p])=>{
+  bounds.push([p.lat,p.lng]);
+  const m = L.marker([p.lat,p.lng], {icon:mkIcon('')}).addTo(map).on('click',()=>onPortClick(name));
+  m.bindTooltip(name, {permanent:true, direction:'right', offset:[8,0]});
+  mkrs[name]=m;
+});
+map.fitBounds(bounds, {padding:[40,40]});
+
+function clearLines(){ rLines.forEach(l=>map.removeLayer(l)); rLines=[]; }
+function resetMarkers(){ Object.entries(mkrs).forEach(([n,m])=>m.setIcon(mkIcon(''))); }
+
+function onPortClick(name){
+  if(mode==='direct'){ selectPort(name); return; }
+  // ── Journey-plan mode ──
+  if(!origin || (origin && dest)){
+    // start fresh: set origin
+    origin=name; dest=null; routeData=null; showingAlt=false;
+    resetMarkers(); clearLines();
+    mkrs[name].setIcon(mkIcon('org'));
+    renderPlanPrompt();
+  } else if(name===origin){
+    // clicking origin again clears it
+    origin=null; resetMarkers(); clearLines(); renderPlanPrompt();
+  } else {
+    // set destination and compute
+    dest=name;
+    mkrs[origin].setIcon(mkIcon('org'));
+    mkrs[dest].setIcon(mkIcon('dst'));
+    computeAndShow();
+  }
+}
+
+// ── Approximate sea waypoints for legs that would otherwise cross land ──
+// Keyed by an unordered "A|B" pair. Each list is the open-sea track between the
+// two ports (excluding the ports themselves). Routes are approximate — the
+// source timetable does not show actual tracks. [lat, lng]
+const SEA = {
+  // Entering/leaving the English Channel & Bay of Biscay, down past Iberia
+  "London|Gibraltar":   [[50.5,-1.5],[49.0,-5.5],[46.0,-8.5],[42.5,-10.0],[37.5,-9.5],[36.2,-7.5]],
+  "London|Las Palmas":  [[50.5,-1.5],[49.0,-6.0],[45.0,-9.5],[40.0,-11.0],[34.0,-11.5],[29.5,-14.5]],
+  // Western Mediterranean
+  "Gibraltar|Marseilles":[[36.3,-3.5],[37.5,1.0],[39.0,4.5],[41.5,5.2]],
+  "Marseilles|Genoa":   [[43.2,6.5],[43.6,8.2]],
+  // Eastern Mediterranean to the Suez approaches
+  "Genoa|Port Said":    [[42.8,9.2],[38.5,11.5],[35.5,17.0],[33.5,24.0],[31.8,30.5]],
+  // Suez Canal + Gulf of Suez
+  "Port Said|Suez":     [[30.6,32.35],[30.0,32.55]],
+  // Red Sea, through Bab-el-Mandeb to Aden
+  "Suez|Aden":          [[28.0,33.7],[24.0,36.5],[19.5,39.5],[15.0,41.8],[13.0,43.3],[12.6,44.5]],
+  // Gulf of Aden, round the Horn, down the East African coast
+  "Aden|Mombasa":       [[11.8,46.5],[9.5,52.0],[2.0,51.5],[-3.0,43.5],[-3.9,40.2]],
+  // East African coastal hops
+  "Mombasa|Tanga":      [[-4.6,39.7]],
+  "Tanga|Zanzibar":     [[-5.7,39.4]],
+  "Zanzibar|Dar es Salaam":[[-6.5,39.5]],
+  // Down to the Mozambique Channel / Beira
+  "Dar es Salaam|Beira":[[-9.0,40.5],[-13.0,40.8],[-17.0,37.5],[-19.6,35.5]],
+  "Beira|Lourenco Marques":[[-21.0,35.5],[-24.0,35.0],[-25.9,33.0]],
+  "Lourenco Marques|Durban":[[-27.0,33.0],[-29.2,31.6]],
+  // South African coast round to Cape Town
+  "Durban|East London": [[-31.0,30.0],[-32.7,28.4]],
+  "East London|Port Elizabeth":[[-33.6,26.8]],
+  "Port Elizabeth|Cape Town":[[-34.5,24.0],[-35.2,20.0],[-35.2,18.5],[-34.4,18.3]],
+  // South Atlantic islands
+  "Cape Town|St Helena":[[-32.0,15.0],[-26.0,8.0],[-19.0,-1.0],[-16.5,-5.0]],
+  "St Helena|Ascension":[[-13.5,-7.5],[-9.5,-12.0]],
+  "Ascension|Las Palmas":[[-4.0,-17.0],[3.0,-20.0],[12.0,-21.0],[22.0,-18.0],[27.5,-16.0]],
+  "Las Palmas|London":  [[29.5,-14.5],[34.0,-11.5],[40.0,-11.0],[45.0,-9.5],[49.0,-6.0],[50.5,-1.5]],
+  // Intermediate West Coast service down the African west coast
+  "Las Palmas|Lobito":  [[26.0,-16.5],[18.0,-19.0],[8.0,-15.0],[0.0,-8.0],[-6.0,2.0],[-11.5,11.0]],
+  "Lobito|Walvis Bay":  [[-14.0,12.0],[-18.5,11.5],[-22.0,13.5]],
+  "Walvis Bay|Cape Town":[[-25.5,14.0],[-30.0,16.5],[-33.0,17.5],[-34.2,18.0]],
+};
+
+function segmentPts(A, B){
+  const key1=A.k+"|"+B.k, key2=B.k+"|"+A.k;
+  let mids = SEA[key1] ? SEA[key1].slice() : (SEA[key2] ? SEA[key2].slice().reverse() : []);
+  return [[A.lat,A.lng], ...mids, [B.lat,B.lng]];
+}
+
+// Catmull-Rom spline through the control points for smooth, natural-looking tracks
+function smooth(ctrl){
+  if(ctrl.length<3) return ctrl;
+  const out=[]; const steps=12;
+  for(let i=0;i<ctrl.length-1;i++){
+    const p0=ctrl[i===0?0:i-1], p1=ctrl[i], p2=ctrl[i+1], p3=ctrl[i+2<ctrl.length?i+2:ctrl.length-1];
+    for(let s=0;s<steps;s++){
+      const t=s/steps, t2=t*t, t3=t2*t;
+      const lat=0.5*((2*p1[0])+(-p0[0]+p2[0])*t+(2*p0[0]-5*p1[0]+4*p2[0]-p3[0])*t2+(-p0[0]+3*p1[0]-3*p2[0]+p3[0])*t3);
+      const lng=0.5*((2*p1[1])+(-p0[1]+p2[1])*t+(2*p0[1]-5*p1[1]+4*p2[1]-p3[1])*t2+(-p0[1]+3*p1[1]-3*p2[1]+p3[1])*t3);
+      out.push([lat,lng]);
+    }
+  }
+  out.push(ctrl[ctrl.length-1]);
+  return out;
+}
+
+function path(a,b){
+  const A={...P[a],k:a}, B={...P[b],k:b};
+  return smooth(segmentPts(A,B));
+}
+
+function selectPort(name){
+  clearLines();
+  resetMarkers();
+  if(mkrs[name]) mkrs[name].setIcon(mkIcon('sel'));
+  const p=P[name];
+  const conns=Object.entries(CONN[name]||{}).map(([dest,l])=>({dest,...l}));
+
+  conns.forEach(c=>{
+    if(!mkrs[c.dest]) return;
+    const line=L.polyline(path(name,c.dest), {color:col(c.d), weight:3, opacity:0.85}).addTo(map);
+    rLines.push(line);
+  });
+
+  document.getElementById('ph-city').textContent=name;
+  document.getElementById('ph-mod').textContent=p.modern;
+  document.getElementById('ph-cnt').textContent=`${conns.length} direct sailing${conns.length!==1?'s':''}`;
+
+  const sorted=[...conns].sort((a,b)=>a.d-b.d);
+  document.getElementById('pc').innerHTML = sorted.length
+    ? sorted.map(c=>{
+        const d=P[c.dest], clr=col(c.d);
+        return `<div class="ri" onclick="selectPort('${c.dest.replace(/'/g,"\\'")}')">
+          <div class="ri-d">${c.dest}</div>
+          <div class="ri-t" style="color:${clr}">${fmt(c.d)}</div>
+          <div class="ri-s">${c.s}</div>
+          ${d?`<div class="ri-m">${d.modern}</div>`:''}
+          ${c.n?`<div class="ri-n">${c.n}</div>`:''}
+        </div>`;
+      }).join('')
+    : '<div class="empty">No direct sailings recorded for this port.</div>';
+}
+
+// ── Mode switching ──
+function setMode(m){
+  mode=m;
+  document.getElementById('mb-direct').classList.toggle('active', m==='direct');
+  document.getElementById('mb-plan').classList.toggle('active', m==='plan');
+  clearLines(); resetMarkers();
+  origin=null; dest=null; routeData=null; showingAlt=false;
+  if(m==='direct'){
+    document.getElementById('hdr-sub').textContent='Click any port to see sailing times · Mail & Intermediate services';
+    document.getElementById('ph-city').textContent='Select a Port';
+    document.getElementById('ph-mod').textContent='Click any port on the map';
+    document.getElementById('ph-cnt').textContent='to see sailing times';
+    document.getElementById('pc').innerHTML='<div class="empty">⚓ Click a port to explore sailing times.<br><br>The route forms a great loop around Africa — out via the Suez Canal and home via the West Coast, or the reverse.</div>';
+  } else {
+    document.getElementById('hdr-sub').textContent='Click a starting port, then a destination · total journey time in days';
+    renderPlanPrompt();
+  }
+}
+
+function renderPlanPrompt(){
+  if(!origin){
+    document.getElementById('ph-city').textContent='Plan a Journey';
+    document.getElementById('ph-mod').textContent='Step 1 of 2';
+    document.getElementById('ph-cnt').textContent='choose a starting port';
+    document.getElementById('pc').innerHTML='<div class="empty">🧭 Click your <b style="color:#1d7a4a">starting port</b> on the map.<br><br>Then click a destination and the map will trace the route and total up the days at sea.</div>';
+  } else {
+    document.getElementById('ph-city').textContent=origin;
+    document.getElementById('ph-mod').textContent=P[origin].modern;
+    document.getElementById('ph-cnt').textContent='now choose a destination';
+    document.getElementById('pc').innerHTML=`<div class="jhint">Departing <b style="color:#1d7a4a">${origin}</b>. Now click your destination port.</div><div class="empty">Click ${origin} again to reset.</div>`;
+  }
+}
+
+function drawRoute(rd){
+  rd.legs.forEach(l=>{
+    const line=L.polyline(path(l.from,l.to), {color:col(l.d), weight:4, opacity:0.92}).addTo(map);
+    rLines.push(line);
+  });
+}
+
+function computeAndShow(){
+  routeData=findBothRoutes(origin, dest);
+  showingAlt=false;
+  renderRoute();
+}
+
+function renderRoute(){
+  clearLines();
+  resetMarkers();
+  mkrs[origin].setIcon(mkIcon('org'));
+  mkrs[dest].setIcon(mkIcon('dst'));
+
+  const {primary, alt}=routeData;
+  const active = (showingAlt && alt) ? alt : primary;
+  if(!active){
+    document.getElementById('pc').innerHTML='<div class="empty">No sea route found between these ports.</div>';
+    return;
+  }
+  active.seq.forEach(n=>{ if(n!==origin&&n!==dest) mkrs[n].setIcon(mkIcon('sel')); });
+  drawRoute(active);
+
+  document.getElementById('ph-city').textContent=`${origin} → ${dest}`;
+  document.getElementById('ph-mod').textContent=`${P[origin].modern}  →  ${P[dest].modern}`;
+  const inter=active.seq.length-2;
+  document.getElementById('ph-cnt').textContent=`${active.legs.length} leg${active.legs.length!==1?'s':''} · ${inter>0?inter+' intermediate port'+(inter===1?'':'s'):'direct'}`;
+
+  const stops=active.seq.slice(1,-1);
+  const viaTxt=stops.length ? 'via '+stops.join(' · ') : 'direct sailing';
+  const altLabel=showingAlt ? 'Show shortest route' : (alt ? `Show the other way round (${alt.days} days)` : '');
+
+  let html=`<div class="jtotal">
+      <div class="jt-d">${active.days}</div>
+      <div class="jt-l">days at sea${showingAlt?' · alternative route':''}</div>
+      <div class="jt-r">${viaTxt}</div>
+    </div>`;
+  if(alt){ html+=`<button class="altbtn" onclick="toggleAlt()">⇄ ${altLabel}</button>`; }
+  html+=active.legs.map((l,i)=>{
+    const clr=col(l.d);
+    return `<div class="jleg">
+      <div class="jleg-num">${i+1}</div>
+      <div class="jleg-body">
+        <div class="jleg-route"><b>${l.from}</b> → <b>${l.to}</b></div>
+        <div class="jleg-meta">${l.s}${l.n?' · '+l.n:''}</div>
+      </div>
+      <div class="jleg-d" style="color:${clr}">${l.d}d</div>
+    </div>`;
+  }).join('');
+  document.getElementById('pc').innerHTML=html;
+}
+
+function toggleAlt(){ showingAlt=!showingAlt; renderRoute(); }
+</script>
+</body>
+</html>
